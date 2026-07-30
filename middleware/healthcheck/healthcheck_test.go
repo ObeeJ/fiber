@@ -439,3 +439,49 @@ func Test_HealthCheck_CBOR_Format(t *testing.T) {
 	require.NotContains(t, readyzResponse, "Status")
 	require.Equal(t, "Service Unavailable", readyzResponse["status"])
 }
+
+func Test_HealthCheck_HEAD(t *testing.T) {
+	t.Parallel()
+
+	// HEAD must return the same status and headers as GET but with no body (RFC 9110).
+	t.Run("healthy", func(t *testing.T) {
+		t.Parallel()
+		app := fiber.New()
+		app.Use(New())
+
+		for _, path := range []string{LivenessEndpoint, ReadinessEndpoint} {
+			getResp, err := app.Test(httptest.NewRequest(fiber.MethodGet, path, http.NoBody))
+			require.NoError(t, err)
+
+			headResp, err := app.Test(httptest.NewRequest(fiber.MethodHead, path, http.NoBody))
+			require.NoError(t, err)
+
+			require.Equal(t, getResp.StatusCode, headResp.StatusCode, "HEAD %s status must match GET", path)
+			body, readErr := io.ReadAll(headResp.Body)
+			require.NoError(t, readErr)
+			require.Empty(t, body, "HEAD %s must return no body", path)
+		}
+	})
+
+	t.Run("unhealthy", func(t *testing.T) {
+		t.Parallel()
+		app := fiber.New()
+		app.Use(New(Config{
+			Probe: func(_ fiber.Ctx) bool { return false },
+		}))
+
+		for _, path := range []string{LivenessEndpoint, ReadinessEndpoint} {
+			getResp, err := app.Test(httptest.NewRequest(fiber.MethodGet, path, http.NoBody))
+			require.NoError(t, err)
+
+			headResp, err := app.Test(httptest.NewRequest(fiber.MethodHead, path, http.NoBody))
+			require.NoError(t, err)
+
+			require.Equal(t, getResp.StatusCode, headResp.StatusCode, "HEAD %s status must match GET", path)
+			require.Equal(t, fiber.StatusServiceUnavailable, headResp.StatusCode)
+			body, readErr := io.ReadAll(headResp.Body)
+			require.NoError(t, readErr)
+			require.Empty(t, body, "HEAD %s must return no body", path)
+		}
+	})
+}

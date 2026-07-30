@@ -57,7 +57,7 @@ app.Get(healthcheck.StartupEndpoint, healthcheck.New())
 app.Get("/healthz", healthcheck.New())
 ```
 
-The middleware responds only to GET. Use `app.All` to expose a probe on every method; other methods fall through to the next handler:
+The middleware responds to `GET` and `HEAD`. `HEAD` returns the same status as `GET` with no response body, as required by RFC 9110. Other methods fall through to the next handler. Use `app.All` to expose a probe on every method:
 
 ```go
 app.All("/healthz", healthcheck.New())
