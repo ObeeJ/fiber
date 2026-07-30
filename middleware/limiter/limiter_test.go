@@ -1870,10 +1870,12 @@ func Test_Config_currentSecond_NegativeClock(t *testing.T) {
 func Test_Limiter_Fixed_SubSecondExpiration(t *testing.T) {
 	t.Parallel()
 
+	clock := newTestClock(time.Now().Truncate(time.Second))
 	app := fiber.New()
 	app.Use(New(Config{
-		Max:        3,
+		Max:               3,
 		LimiterMiddleware: FixedWindow{},
+		clock:             clock.Now,
 		ExpirationFunc: func(_ fiber.Ctx) time.Duration {
 			return 500 * time.Millisecond // sub-second: truncates to 0 without the fix
 		},

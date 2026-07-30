@@ -205,6 +205,7 @@ func Test_Logger_New_TimeDoneUpdater(t *testing.T) {
 }
 
 func Test_sanitizeLog(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		expected string
@@ -225,6 +226,7 @@ func Test_sanitizeLog(t *testing.T) {
 }
 
 func Test_sanitizeLogBytes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    []byte
 		expected []byte
@@ -262,22 +264,28 @@ func Test_sanitizeLogBytes_ZeroAllocOnCleanInput(t *testing.T) {
 }
 
 func Test_Logger_HeaderInjectionPrevented(t *testing.T) {
+	t.Parallel()
 	app := fiber.New()
 	var buf bytes.Buffer
 	app.Use(New(Config{
 		Format: "${reqHeader:X-Evil}\n",
 		Stream: &buf,
 	}))
-	app.Get("/", func(c fiber.Ctx) error { return c.SendStatus(200) })
+	app.Get("/", func(c fiber.Ctx) error {
+		// Simulate a raw header value containing a newline as fasthttp sees it,
+		// bypassing net/http's header sanitization in httptest.NewRequest.
+		c.Request().Header.Set("X-Evil", "value\ninjected-header: evil")
+		return c.Next()
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set("X-Evil", "value\ninjected-header: evil")
 	_, err := app.Test(req)
 	require.NoError(t, err)
 	require.Contains(t, buf.String(), "value injected-header: evil")
 }
 
 func Test_Logger_QueryInjectionPrevented(t *testing.T) {
+	t.Parallel()
 	app := fiber.New()
 	var buf bytes.Buffer
 	app.Use(New(Config{
@@ -294,6 +302,7 @@ func Test_Logger_QueryInjectionPrevented(t *testing.T) {
 }
 
 func Test_Logger_PathInjectionPrevented(t *testing.T) {
+	t.Parallel()
 	app := fiber.New()
 	var buf bytes.Buffer
 	app.Use(New(Config{
@@ -313,6 +322,7 @@ func Test_Logger_PathInjectionPrevented(t *testing.T) {
 }
 
 func Test_Logger_BodyInjectionPrevented(t *testing.T) {
+	t.Parallel()
 	app := fiber.New()
 	var buf bytes.Buffer
 	app.Use(New(Config{
@@ -329,6 +339,7 @@ func Test_Logger_BodyInjectionPrevented(t *testing.T) {
 }
 
 func Test_Logger_ErrorInjectionPrevented(t *testing.T) {
+	t.Parallel()
 	app := fiber.New()
 	var buf bytes.Buffer
 	app.Use(New(Config{
